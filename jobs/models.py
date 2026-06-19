@@ -23,18 +23,72 @@ class Candidate(models.Model):
 
 
 class Job(models.Model):
-    recruiter = models.ForeignKey(Recruiter, on_delete=models.CASCADE)
-    title = models.CharField(max_length=100)
+
+    JOB_TYPES = [
+        ("FULL_TIME", "Full Time"),
+        ("PART_TIME", "Part Time"),
+        ("REMOTE", "Remote"),
+    ]
+
+    recruiter = models.ForeignKey(
+        Recruiter,
+        on_delete=models.CASCADE,
+        related_name="jobs"
+    )
+
+    title = models.CharField(
+        max_length=100
+    )
+
     description = models.TextField()
 
+    skills = models.TextField()
+
+    experience = models.IntegerField()
+
+    salary_min = models.IntegerField()
+
+    salary_max = models.IntegerField()
+
+    location = models.CharField(
+        max_length=100
+    )
+
+    job_type = models.CharField(
+        max_length=20,
+        choices=JOB_TYPES
+    )
+
+    status = models.BooleanField(
+        default=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    is_featured = models.BooleanField(
+        default=False
+    )
     def __str__(self):
         return self.title
 
-
 class Application(models.Model):
-    candidate = models.ForeignKey(Candidate, on_delete=models.CASCADE)
-    job = models.ForeignKey(Job, on_delete=models.CASCADE)
-    applied_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.candidate} applied for {self.job}"
+    STATUS_CHOICES = [
+        ("applied", "Applied"),
+        ("shortlisted", "Shortlisted"),
+        ("interview", "Interview Scheduled"),
+        ("rejected", "Rejected"),
+        ("selected", "Selected"),
+    ]
+
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default="applied"
+    )
