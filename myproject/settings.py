@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'profiles',
     'django_filters',
     "applications",
+    'admin_panel',
 ]
 
 

@@ -4,7 +4,13 @@ from .views import (
     ApplicationHistoryAPIView,
     JobApplicantsAPIView,
     UpdateApplicationStatusAPIView,
-    ApplicationLogAPIView
+    ApplicationLogAPIView,
+    CandidateDashboardAPIView,
+    SaveJobAPIView,
+    SavedJobsAPIView,
+    RemoveSavedJobAPIView,
+    JobRecommendationAPIView,
+    NotificationAPIView
 )
 
 urlpatterns = [
@@ -33,4 +39,34 @@ urlpatterns = [
         "<int:pk>/logs/", 
         ApplicationLogAPIView.as_view()
     ),
+
+    path(
+        "candidate/dashboard/",
+        CandidateDashboardAPIView.as_view()
+    ),
+
+    path(
+    "jobs/<int:job_id>/save/",
+    SaveJobAPIView.as_view()
+    ),
+
+    path(
+    "saved-jobs/",
+    SavedJobsAPIView.as_view()
+    ),
+
+    path(
+    "jobs/<int:job_id>/unsave/",
+    RemoveSavedJobAPIView.as_view()
+    ),
+
+    path(
+    "recommendations/",
+    JobRecommendationAPIView.as_view()
+    ),
+
+    path(
+    "notifications/",
+    NotificationAPIView.as_view()
+),
 ]

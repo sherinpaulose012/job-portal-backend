@@ -21,8 +21,12 @@ urlpatterns = [
 
     path(
     "applications/",
-    include("applications.urls")
-)
+    include("applications.urls")),
+
+    path(
+    "api/admin/",
+    include("admin_panel.urls"))
+
 ]
 
 if settings.DEBUG:

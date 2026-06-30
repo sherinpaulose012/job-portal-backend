@@ -216,3 +216,81 @@ class UserTestAPIView(APIView):
             },
             status=status.HTTP_200_OK
         )
+    
+class EmployerJobsAPIView(ListAPIView):
+
+    serializer_class = JobSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+        IsEmployer
+    ]
+
+    def get_queryset(self):
+
+        recruiter = Recruiter.objects.get(
+            user__email=self.request.user.email
+        )
+
+        return Job.objects.filter(
+            recruiter=recruiter
+        ).order_by("-created_at")    
+    
+from applications.models import Application
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+
+class EmployerAnalyticsAPIView(APIView):
+
+    permission_classes = [
+        IsAuthenticated,
+        IsEmployer
+    ]
+
+    def get(self, request):
+
+        recruiter = Recruiter.objects.get(
+            user__email=request.user.email
+        )
+
+        jobs = Job.objects.filter(
+            recruiter=recruiter
+        )
+
+        total_jobs = jobs.count()
+
+        total_applications = Application.objects.filter(
+            job__in=jobs
+        ).count()
+
+        shortlisted = Application.objects.filter(
+            job__in=jobs,
+            status="shortlisted"
+        ).count()
+
+        selected = Application.objects.filter(
+            job__in=jobs,
+            status="selected"
+        ).count()
+
+        rejected = Application.objects.filter(
+            job__in=jobs,
+            status="rejected"
+        ).count()
+
+        shortlist_ratio = 0
+        if total_applications > 0:
+            shortlist_ratio = round(
+                (shortlisted / total_applications) * 100,
+                2
+            )
+
+        return Response({
+            "total_jobs": total_jobs,
+            "total_applications": total_applications,
+            "shortlisted": shortlisted,
+            "selected": selected,
+            "rejected": rejected,
+            "shortlist_ratio": shortlist_ratio
+        })

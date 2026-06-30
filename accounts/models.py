@@ -52,3 +52,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+    
+    is_flagged = models.BooleanField(
+    default=False
+    )
+
+    flag_reason = models.TextField(
+    blank=True
+    )

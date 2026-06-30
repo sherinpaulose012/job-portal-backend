@@ -40,6 +40,7 @@ class EmployerProfile(models.Model):
         related_name="employer_profile"
     )
 
+    
     company_name = models.CharField(max_length=255)
     domain = models.CharField(max_length=255)
     company_size = models.IntegerField()

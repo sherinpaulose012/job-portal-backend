@@ -2,20 +2,19 @@ from django.db import models
 from django.conf import settings
 
 
-class Employer(models.Model):
+class AuditLog(models.Model):
 
-    user = models.OneToOneField(
+    admin = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE
     )
 
-    company_name = models.CharField(
-        max_length=255,
-        blank=True
+    action = models.CharField(
+        max_length=255
     )
 
-    is_approved = models.BooleanField(
-        default=False
+    target = models.CharField(
+        max_length=255
     )
 
     created_at = models.DateTimeField(
@@ -23,4 +22,4 @@ class Employer(models.Model):
     )
 
     def __str__(self):
-        return self.user.email
+        return f"{self.admin.email} - {self.action}"

@@ -88,3 +88,48 @@ class ApplicationStatusLog(models.Model):
             f" → "
             f"{self.new_status}"
         )    
+    
+class SavedJob(models.Model):
+
+    candidate = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="saved_jobs"
+    )
+
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.CASCADE,
+        related_name="saved_by"
+    )
+
+    saved_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    class Meta:
+        unique_together = (
+            "candidate",
+            "job"
+        )    
+
+class Notification(models.Model):
+
+    candidate = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+
+    message = models.TextField()
+
+    is_read = models.BooleanField(
+        default=False
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return self.message        
