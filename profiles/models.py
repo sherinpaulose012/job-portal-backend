@@ -27,6 +27,10 @@ class CandidateProfile(models.Model):
         blank=True,
         null=True
     )
+    
+    parsed_resume = models.TextField(
+        blank=True
+    )
 
     is_deleted = models.BooleanField(default=False)
 

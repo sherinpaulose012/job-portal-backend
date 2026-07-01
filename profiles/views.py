@@ -8,6 +8,11 @@ from .serializers import CandidateProfileSerializer, EmployerProfileSerializer
 from .permissions import IsOwnerOrAdmin
 
 from .serializers import ResumeUploadSerializer
+
+from candidate.utils import (
+    extract_resume_text,
+    clean_resume_text,
+)
 # =========================
 # CANDIDATE PROFILE API
 # =========================
@@ -168,15 +173,22 @@ class ResumeUploadView(APIView):
         
         profile.resume = serializer.validated_data['resume']
         profile.save()
+
+        text = extract_resume_text(
+        profile.resume.path
+    )
+
+        cleaned = clean_resume_text(text)
     
 
         return Response({
-    "message": (
+        "message": (
         "Resume replaced successfully"
         if resume_replaced
         else "Resume uploaded successfully"
     ),
-    "resume": profile.resume.url
+    "resume": profile.resume.url,
+    "extracted_text": cleaned
 })
     
 
