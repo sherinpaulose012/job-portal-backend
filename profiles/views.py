@@ -12,6 +12,10 @@ from .serializers import ResumeUploadSerializer
 from candidate.utils import (
     extract_resume_text,
     clean_resume_text,
+    extract_skills,
+    extract_experience,
+    extract_education,
+    tokenize,
 )
 # =========================
 # CANDIDATE PROFILE API
@@ -77,6 +81,7 @@ class CandidateProfileAPIView(APIView):
 
         self.check_object_permissions(request, profile)
 
+        
         profile.is_deleted = True
         profile.save()
 
@@ -179,19 +184,48 @@ class ResumeUploadView(APIView):
     )
 
         cleaned = clean_resume_text(text)
-    
+        resume_json = {
+            "skills": extract_skills(cleaned),
+            "experience_years": extract_experience(cleaned),
+            "education": extract_education(cleaned),
+            "tokens": tokenize(cleaned),
+        }
+
+        profile.parsed_resume = cleaned
+        profile.save()
 
         return Response({
-        "message": (
+    "message": (
         "Resume replaced successfully"
         if resume_replaced
         else "Resume uploaded successfully"
     ),
     "resume": profile.resume.url,
-    "extracted_text": cleaned
+    "extracted_text": cleaned,
+    "parsed_data": resume_json
 })
     
 
-    
-    
+from candidate.ats import calculate_ats_score
+from jobs.models import Job
 
+class ATSMatchAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, job_id):
+
+        profile = CandidateProfile.objects.get(
+            user=request.user
+        )
+
+        job = Job.objects.get(
+            id=job_id
+        )
+
+        result = calculate_ats_score(
+            profile.parsed_resume,
+            job
+        )
+
+        return Response(result)

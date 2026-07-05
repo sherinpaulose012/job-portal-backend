@@ -28,6 +28,9 @@ from .serializers import SavedJobSerializer
 
 from profiles.models import CandidateProfile
 
+from candidate.ats import calculate_ats_score
+from .models import ATSScore
+
 class ApplyJobAPIView(APIView):
 
     permission_classes = [
@@ -67,6 +70,21 @@ class ApplyJobAPIView(APIView):
             candidate=request.user,
             job=job,
             resume_snapshot=request.user.candidate_profile.resume
+        )
+
+        profile = CandidateProfile.objects.get(
+        user=request.user
+        )
+
+        result = calculate_ats_score(
+            profile.parsed_resume,
+            job
+        )
+
+        ATSScore.objects.create(
+        application=application,
+        score=result["score"],
+        matched_skills=result["matched_skills"]
         )
 
         serializer = ApplicationSerializer(
@@ -452,3 +470,86 @@ class NotificationAPIView(ListAPIView):
         return Notification.objects.filter(
             candidate=self.request.user
         ).order_by("-created_at")    
+    
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from .models import ATSScore
+
+class ATSScoreAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+
+        scores = ATSScore.objects.all().values(
+            "application_id",
+            "score",
+            "matched_skills"
+        )
+
+        return Response(scores)   
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from jobs.models import Job, User
+from .models import ATSScore
+
+
+class RankedCandidatesAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, job_id):
+
+        # Find recruiter in jobs app
+        recruiter = User.objects.filter(
+            email=request.user.email
+        ).first()
+
+        if not recruiter:
+            return Response(
+                {"error": "Recruiter not found"},
+                status=404
+            )
+
+        try:
+            job = Job.objects.get(
+                id=job_id,
+                recruiter__user=recruiter
+            )
+        except Job.DoesNotExist:
+            return Response(
+                {
+                    "error": "Job not found or you are not authorized"
+                },
+                status=404
+            )
+
+        scores = (
+            ATSScore.objects
+            .filter(application__job=job)
+            .select_related(
+                "application",
+                "application__candidate"
+            )
+            .order_by("-score")
+        )
+
+        data = []
+
+        for score in scores:
+
+            data.append({
+                "candidate": score.application.candidate.email,
+                "application_id": score.application.id,
+                "score": score.score,
+                "matched_skills": score.matched_skills
+            })
+
+        return Response(data)

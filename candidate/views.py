@@ -38,3 +38,37 @@ class ResumeUploadView(APIView):
 )
 
         return Response(serializer.errors, status=400)
+    
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from profiles.models import CandidateProfile
+from jobs.models import Job
+
+from .ats import calculate_ats_score
+
+
+class ATSMatchAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, job_id):
+
+        profile = CandidateProfile.objects.get(
+            user=request.user
+        )
+
+        job = Job.objects.get(
+            id=job_id
+        )
+
+        result = calculate_ats_score(
+            profile.parsed_resume,
+            job
+        )
+
+        return Response(result)    
+    
+

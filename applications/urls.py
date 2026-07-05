@@ -10,7 +10,9 @@ from .views import (
     SavedJobsAPIView,
     RemoveSavedJobAPIView,
     JobRecommendationAPIView,
-    NotificationAPIView
+    NotificationAPIView,
+    ATSScoreAPIView,
+    RankedCandidatesAPIView
 )
 
 urlpatterns = [
@@ -68,5 +70,13 @@ urlpatterns = [
     path(
     "notifications/",
     NotificationAPIView.as_view()
+    ),
+
+    path("ats-scores/", ATSScoreAPIView.as_view()),
+
+    path(
+    "jobs/<int:job_id>/ranked-candidates/",
+    RankedCandidatesAPIView.as_view(),
+    name="ranked-candidates",
 ),
 ]

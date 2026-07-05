@@ -3,6 +3,7 @@ from .views import (
     CandidateProfileAPIView,
     EmployerProfileAPIView,
     ResumeUploadView,
+    ATSMatchAPIView,
 )
 
 urlpatterns = [
@@ -13,4 +14,10 @@ urlpatterns = [
 
     path('employer/', EmployerProfileAPIView.as_view()),
     path('employer/<int:pk>/', EmployerProfileAPIView.as_view()),
+
+    path(
+    "candidate/ats/<int:job_id>/",
+    ATSMatchAPIView.as_view(),
+    name="ats-match",
+),
 ]

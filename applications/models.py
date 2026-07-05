@@ -133,3 +133,20 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.message        
+    
+
+class ATSScore(models.Model):
+
+    application = models.OneToOneField(
+        Application,
+        on_delete=models.CASCADE
+    )
+
+    score = models.FloatField(default=0)
+
+    matched_skills = models.JSONField(default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.application.id} - {self.score}"    
