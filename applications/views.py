@@ -31,6 +31,12 @@ from profiles.models import CandidateProfile
 from candidate.ats import calculate_ats_score
 from .models import ATSScore
 
+from candidate.ats import calculate_ats_score
+from candidate.automation import auto_process
+from profiles.models import CandidateProfile
+from applications.models import ATSScore
+
+
 class ApplyJobAPIView(APIView):
 
     permission_classes = [
@@ -553,3 +559,42 @@ class RankedCandidatesAPIView(APIView):
             })
 
         return Response(data)
+    
+class AutoProcessAPIView(APIView):
+
+    permission_classes = [
+        IsAuthenticated,
+        IsEmployer
+    ]
+
+    def post(self, request, application_id):
+
+        application = Application.objects.get(id=application_id)
+
+        profile = CandidateProfile.objects.get(
+            user=application.candidate
+        )
+
+        result = calculate_ats_score(
+            profile.parsed_resume,
+            application.job
+        )
+
+        status = auto_process(result)
+
+        application.status = status
+        application.save()
+
+        ATSScore.objects.update_or_create(
+            application=application,
+            defaults={
+                "score": result["score"],
+                "matched_skills": result["matched_skills"]
+            }
+        )
+
+        return Response({
+            "application": application.id,
+            "score": result["score"],
+            "status": application.status
+        })
