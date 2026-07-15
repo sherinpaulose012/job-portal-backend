@@ -16,13 +16,15 @@ class Application(models.Model):
     candidate = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="applications"
+        related_name="applications",
+        db_index=True
     )
 
     job = models.ForeignKey(
         Job,
         on_delete=models.CASCADE,
-        related_name="applications"
+        related_name="applications",
+        db_index=True
     )
 
     resume_snapshot = models.FileField(
@@ -32,7 +34,8 @@ class Application(models.Model):
     status = models.CharField(
         max_length=30,
         choices=STATUS_CHOICES,
-        default="applied"
+        default="applied",
+        db_index=True
     )
 
     applied_date = models.DateTimeField(

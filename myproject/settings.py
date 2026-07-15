@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'django_filters',
     "applications",
     'admin_panel',
+    "notifications",
 ]
 
 
@@ -162,3 +163,7 @@ AUTH_USER_MODEL = "accounts.User"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = "noreply@jobportal.com"

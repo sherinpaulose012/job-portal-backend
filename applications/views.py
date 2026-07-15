@@ -36,6 +36,17 @@ from candidate.automation import auto_process
 from profiles.models import CandidateProfile
 from applications.models import ATSScore
 
+from notifications.tasks import send_email_async
+from notifications.templates import APPLICATION_SUBMITTED
+
+from notifications.email_service import send_email
+from notifications.templates import (
+    SHORTLISTED,
+    REJECTED,
+)
+
+from django.core.cache import cache
+
 
 class ApplyJobAPIView(APIView):
 
@@ -78,6 +89,13 @@ class ApplyJobAPIView(APIView):
             resume_snapshot=request.user.candidate_profile.resume
         )
 
+        send_email_async(
+            to_email=request.user.email,
+            subject="Application Submitted",
+            message=APPLICATION_SUBMITTED
+        )
+
+
         profile = CandidateProfile.objects.get(
         user=request.user
         )
@@ -113,11 +131,12 @@ class ApplicationHistoryAPIView(ListAPIView):
 
     def get_queryset(self):
 
-        return Application.objects.filter(
-            candidate=self.request.user
-        ).order_by(
-            "-applied_date"
-        )    
+        return (
+        Application.objects
+        .select_related("candidate", "job")
+        .filter(candidate=self.request.user)
+        .order_by("-applied_date")
+    )  
     
 class JobApplicantsAPIView(ListAPIView):
 
@@ -130,9 +149,15 @@ class JobApplicantsAPIView(ListAPIView):
 
     def get_queryset(self):
 
-        queryset = Application.objects.filter(
-            job_id=self.kwargs["job_id"]
+        queryset = (
+            Application.objects
+            .select_related(
+            "candidate",
+            "job",
+            "job__recruiter"
         )
+    .filter(job_id=self.kwargs["job_id"])
+)
 
         status_filter = self.request.GET.get(
             "status"
@@ -256,6 +281,22 @@ class UpdateApplicationStatusAPIView(UpdateAPIView):
 
         application.save()
 
+        if new_status == "shortlisted":
+
+            send_email_async(
+                to_email=application.candidate.email,
+                subject="Application Shortlisted",
+                message=SHORTLISTED
+            )
+
+        elif new_status == "rejected":
+
+            send_email_async(
+                to_email=application.candidate.email,
+                subject="Application Rejected",
+                message=REJECTED
+            )
+
         Notification.objects.create(
         candidate=application.candidate,
         message=(
@@ -295,9 +336,11 @@ class CandidateDashboardAPIView(APIView):
 
     def get(self, request):
 
-        applications = Application.objects.filter(
-            candidate=request.user
-        )
+        applications = (
+        Application.objects
+        .select_related("job")
+        .filter(candidate=request.user)
+    )
 
         applied_jobs = applications.count()
 
@@ -364,9 +407,12 @@ class SavedJobsAPIView(ListAPIView):
 
     def get_queryset(self):
 
-        return SavedJob.objects.filter(
-            candidate=self.request.user
-        ).order_by("-saved_at")
+        return (
+    SavedJob.objects
+    .select_related("job")
+    .filter(candidate=self.request.user)
+    .order_by("-saved_at")
+)
 
 
 class RemoveSavedJobAPIView(APIView):
@@ -404,6 +450,13 @@ class JobRecommendationAPIView(APIView):
 
     def get(self, request):
 
+        cache_key = f"recommendations_{request.user.id}"
+
+        recommendations = cache.get(cache_key)
+
+        if recommendations:
+            return Response(recommendations)
+
         try:
             profile = CandidateProfile.objects.get(
                 user=request.user
@@ -424,43 +477,20 @@ class JobRecommendationAPIView(APIView):
 
         recommendations = []
 
-        for job in jobs:
-
-            job_skills = [
-                skill.strip().lower()
-                for skill in job.skills.split(",")
-            ]
-
-            matched = list(
-                set(candidate_skills) &
-                set(job_skills)
-            )
-
-            missing = list(
-                set(job_skills) -
-                set(candidate_skills)
-            )
-
-            if matched:
-                match_percentage = int(
-                    (len(matched) / len(job_skills)) * 100
-                )
-
-                recommendations.append({
-                "job_id": job.id,
-                "title": job.title,
-                "company": str(job.recruiter),
-                "matched_skills": matched,
-                "missing_skills": missing,
-                "match_percentage": match_percentage
-            })
+        # Your existing recommendation code here...
 
         recommendations.sort(
             key=lambda x: x["match_percentage"],
             reverse=True
         )
 
-        return Response(recommendations)    
+        cache.set(
+            cache_key,
+            recommendations,
+            timeout=60
+        )
+
+        return Response(recommendations)
     
 class NotificationAPIView(ListAPIView):
 
@@ -473,9 +503,12 @@ class NotificationAPIView(ListAPIView):
 
     def get_queryset(self):
 
-        return Notification.objects.filter(
-            candidate=self.request.user
-        ).order_by("-created_at")    
+        return (
+    Notification.objects
+    .select_related("candidate")
+    .filter(candidate=self.request.user)
+    .order_by("-created_at")
+)    
     
 
 from rest_framework.views import APIView
@@ -505,11 +538,14 @@ from rest_framework.permissions import IsAuthenticated
 
 from jobs.models import Job, User
 from .models import ATSScore
-
+from accounts.permissions import IsEmployer
 
 class RankedCandidatesAPIView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated,
+        IsEmployer
+    ]
 
     def get(self, request, job_id):
 
