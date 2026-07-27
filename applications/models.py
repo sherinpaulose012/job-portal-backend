@@ -13,6 +13,13 @@ class Application(models.Model):
         ("rejected", "Rejected"),
     ]
 
+    CALL_STATUS = [
+        ("QUEUED", "Queued"),
+        ("IN_PROGRESS", "In Progress"),
+        ("COMPLETED", "Completed"),
+        ("FAILED", "Failed"),
+    ]
+
     candidate = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -37,6 +44,12 @@ class Application(models.Model):
         default="applied",
         db_index=True
     )
+
+    call_status = models.CharField(
+    max_length=20,
+    choices=CALL_STATUS,
+    default="QUEUED"
+)
 
     applied_date = models.DateTimeField(
         auto_now_add=True

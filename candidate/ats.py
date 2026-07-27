@@ -1,21 +1,13 @@
-from .utils import (
-    extract_skills,
-    extract_experience,
-    extract_education,
-)
-
+from .utils import (extract_skills,extract_experience,extract_education,)
 
 def calculate_ats_score(resume_text, job):
 
     resume_skills = extract_skills(resume_text)
     experience = extract_experience(resume_text)
     education = extract_education(resume_text)
-
     score = 0
 
-    # -------------------------
-    # Skills (60 points)
-    # -------------------------
+    # Skills 
     job_skills = []
 
     if job.skills:
@@ -33,9 +25,7 @@ def calculate_ats_score(resume_text, job):
     if len(job_skills) > 0:
         score += (len(matched_skills) / len(job_skills)) * 60
 
-    # -------------------------
-    # Experience (25 points)
-    # -------------------------
+    # Experience 
     required = job.experience
 
     if experience >= required:
@@ -43,9 +33,8 @@ def calculate_ats_score(resume_text, job):
     elif required > 0:
         score += (experience / required) * 25
 
-    # -------------------------
-    # Education (15 points)
-    # -------------------------
+    
+    # Education 
     if education:
         score += 15
 
