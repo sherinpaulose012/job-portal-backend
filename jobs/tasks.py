@@ -78,3 +78,15 @@ def trigger_ai_interview(application_id):
         "interview_score": 88,
         "questions_generated": True
     }
+
+from .ai_bridge import AIBridge
+
+
+@shared_task
+def start_ai_voice_call(job_title):
+
+    bridge = AIBridge()
+
+    responses = bridge.start_interview(job_title)
+
+    return responses
