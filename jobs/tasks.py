@@ -90,3 +90,42 @@ def start_ai_voice_call(job_title):
     responses = bridge.start_interview(job_title)
 
     return responses
+
+@shared_task
+def send_interview_confirmation_email(
+    email,
+    job_title,
+    interview_date,
+    interview_time,
+):
+
+    subject = "AI Interview Scheduled"
+
+    message = f"""
+Hello,
+
+Your AI Interview has been scheduled successfully.
+
+Job : {job_title}
+
+Date : {interview_date}
+
+Time : {interview_time}
+
+Please be available.
+
+Best Regards
+AI Recruitment Team
+"""
+
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        fail_silently=False,
+    )
+
+    print("Interview Confirmation Email Sent")
+
+    return "Interview Email Sent"

@@ -13,6 +13,7 @@ from .pagination import JobPagination
 from .permissions import IsEmployer
 
 from .filters import JobFilter
+from .permissions import IsRecruiter
 
 # Job List API
 class JobListAPIView(ListAPIView):
@@ -294,3 +295,147 @@ class EmployerAnalyticsAPIView(APIView):
             "rejected": rejected,
             "shortlist_ratio": shortlist_ratio
         })
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+from .answer_service import evaluate_answer
+from .models import AnswerEvaluation
+from .serializers import AnswerEvaluationSerializer
+
+
+class EvaluateAnswerAPIView(APIView):
+
+    def post(self, request, answer_id):
+
+        evaluation = evaluate_answer(answer_id)
+
+        serializer = AnswerEvaluationSerializer(evaluation)
+
+        return Response(serializer.data)
+
+
+class EvaluationResultAPIView(APIView):
+
+    def get(self, request, answer_id):
+
+        evaluation = AnswerEvaluation.objects.get(
+            answer_id=answer_id
+        )
+
+        serializer = AnswerEvaluationSerializer(evaluation)
+
+        return Response(serializer.data)    
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+from applications.models import Application
+from .schedule_engine import SchedulingEngine
+from .notifications import send_interview_notification
+
+class ScheduleInterviewAPIView(APIView):
+
+    def post(self, request, application_id):
+
+        try:
+            application = Application.objects.get(id=application_id)
+
+        except Application.DoesNotExist:
+
+            return Response(
+                {
+                    "success": False,
+                    "message": "Application not found"
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        engine = SchedulingEngine()
+
+        schedule = engine.schedule_interview(application)
+
+        if not schedule:
+
+            return Response(
+                {
+                    "success": False,
+                    "message": "No interview slots available"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        send_interview_notification(schedule)
+
+        schedule.confirmation_sent = True
+        schedule.save()
+
+        return Response(
+            {
+                "success": True,
+                "message": "Interview scheduled successfully",
+                "application_id": application.id,
+                "date": str(schedule.slot.date),
+                "start_time": str(schedule.slot.start_time),
+                "status": schedule.status
+            },
+            status=status.HTTP_200_OK
+        )    
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from applications.models import Application
+
+from .report_service import CandidateReportService
+from .report_serializer import CandidateReportSerializer
+class CandidateReportAPIView(APIView):
+
+    permission_classes = [
+        IsAuthenticated,
+        IsRecruiter
+    ]
+
+    def get(self, request, application_id):
+
+        application = Application.objects.get(
+            id=application_id
+        )
+
+        report = CandidateReportService().generate(
+            application
+        )
+
+        serializer = CandidateReportSerializer(
+            report
+        )
+
+        return Response(serializer.data)    
+
+from .analytics_service import AnalyticsService
+from .permissions import IsRecruiter
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+
+class AnalyticsDashboardAPIView(APIView):
+
+    permission_classes = [
+        IsAuthenticated,
+        IsRecruiter
+    ]
+
+    def get(self, request):
+
+        service = AnalyticsService()
+
+        return Response(
+            service.dashboard()
+        )    

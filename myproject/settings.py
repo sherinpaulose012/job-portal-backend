@@ -187,3 +187,10 @@ CELERY_TIMEZONE = "Asia/Kolkata"
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 DEFAULT_FROM_EMAIL = "noreply@zecpath.com"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "analytics-cache",
+    }
+}
