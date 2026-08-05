@@ -15,6 +15,8 @@ from .permissions import IsEmployer
 from .filters import JobFilter
 from .permissions import IsRecruiter
 
+from .throttles import AIRateThrottle
+
 # Job List API
 class JobListAPIView(ListAPIView):
 
@@ -299,22 +301,54 @@ class EmployerAnalyticsAPIView(APIView):
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
 from .answer_service import evaluate_answer
-from .models import AnswerEvaluation
 from .serializers import AnswerEvaluationSerializer
+from .logging_service import LoggingService
+from .security import EncryptionService
 
 
 class EvaluateAnswerAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    throttle_classes = [AIRateThrottle]
 
     def post(self, request, answer_id):
 
         evaluation = evaluate_answer(answer_id)
 
+        logger = LoggingService()
+
+        logger.log_ai_action(
+            request.user,
+            "Answer Evaluation",
+            f"Answer ID {answer_id} evaluated"
+        )
+
         serializer = AnswerEvaluationSerializer(evaluation)
 
-        return Response(serializer.data)
+        data = serializer.data
 
+        security = EncryptionService()
+
+        data["ai_feedback"] = security.decrypt(
+            data["ai_feedback"]
+        )
+
+        return Response(data)
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+from .answer_service import evaluate_answer
+from .models import AnswerEvaluation
+from .serializers import AnswerEvaluationSerializer
+from .logging_service import LoggingService
+from .security import EncryptionService
 
 class EvaluationResultAPIView(APIView):
 
@@ -326,8 +360,15 @@ class EvaluationResultAPIView(APIView):
 
         serializer = AnswerEvaluationSerializer(evaluation)
 
-        return Response(serializer.data)    
+        data = serializer.data
 
+        security = EncryptionService()
+
+        data["ai_feedback"] = security.decrypt(
+            data["ai_feedback"]
+        )
+
+        return Response(data)
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -336,6 +377,8 @@ from rest_framework import status
 from applications.models import Application
 from .schedule_engine import SchedulingEngine
 from .notifications import send_interview_notification
+from .logging_service import LoggingService
+
 
 class ScheduleInterviewAPIView(APIView):
 
@@ -345,6 +388,14 @@ class ScheduleInterviewAPIView(APIView):
             application = Application.objects.get(id=application_id)
 
         except Application.DoesNotExist:
+
+            logger = LoggingService()
+
+            logger.log_error(
+                "ApplicationNotFound",
+                f"Application ID {application_id} not found",
+                "ScheduleInterviewAPIView"
+            )
 
             return Response(
                 {
@@ -373,6 +424,14 @@ class ScheduleInterviewAPIView(APIView):
         schedule.confirmation_sent = True
         schedule.save()
 
+        logger = LoggingService()
+
+        logger.log_admin_action(
+            request.user,
+            "Interview Scheduled",
+            f"Application ID {application.id}"
+        )
+
         return Response(
             {
                 "success": True,
@@ -383,8 +442,7 @@ class ScheduleInterviewAPIView(APIView):
                 "status": schedule.status
             },
             status=status.HTTP_200_OK
-        )    
-
+        )
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -399,6 +457,10 @@ class CandidateReportAPIView(APIView):
     permission_classes = [
         IsAuthenticated,
         IsRecruiter
+    ]
+
+    throttle_classes = [
+    AIRateThrottle
     ]
 
     def get(self, request, application_id):
@@ -430,6 +492,10 @@ class AnalyticsDashboardAPIView(APIView):
     permission_classes = [
         IsAuthenticated,
         IsRecruiter
+    ]
+
+    throttle_classes = [
+    AIRateThrottle
     ]
 
     def get(self, request):

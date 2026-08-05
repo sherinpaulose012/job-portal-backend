@@ -382,3 +382,80 @@ class ReminderLog(models.Model):
             f"{self.schedule.application.id} - "
             f"{self.reminder_type}"
         )    
+
+class AuditTrail(models.Model):
+
+    ACTION_CHOICES = [
+        ("USER", "User"),
+        ("ADMIN", "Admin"),
+        ("AI", "AI"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    action_type = models.CharField(
+        max_length=20,
+        choices=ACTION_CHOICES
+    )
+
+    action = models.CharField(
+        max_length=200
+    )
+
+    details = models.TextField(
+        blank=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return f"{self.action_type} - {self.action}"
+
+class ErrorLog(models.Model):
+
+    error_type = models.CharField(
+        max_length=100
+    )
+
+    message = models.TextField()
+
+    source = models.CharField(
+        max_length=100
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return self.error_type
+
+class SecurityLog(models.Model):
+
+    ip_address = models.GenericIPAddressField()
+
+    event = models.CharField(
+        max_length=200
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return self.event    
+        

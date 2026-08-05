@@ -23,9 +23,6 @@ def check_candidate_eligibility(application):
         return False, "Candidate not shortlisted"
 
     # Rule 3
-    # Rule 3
-    if not application.job.status:
-
+    if application.job.status is False:
         return False, "Job is closed"
-
     return True, "Eligible"

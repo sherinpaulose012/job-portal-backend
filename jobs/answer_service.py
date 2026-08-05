@@ -1,5 +1,6 @@
 from .evaluation import AnswerScoringEngine
 from .models import AIAnswer, AnswerEvaluation
+from .security import EncryptionService
 
 
 def evaluate_answer(answer_id):
@@ -10,6 +11,12 @@ def evaluate_answer(answer_id):
 
     result = engine.evaluate(answer.answer)
 
+    security = EncryptionService()
+
+    encrypted_feedback = security.encrypt(
+        result["feedback"]
+    )
+
     evaluation = AnswerEvaluation.objects.create(
         answer=answer,
         relevance_score=result["relevance"],
@@ -17,7 +24,7 @@ def evaluate_answer(answer_id):
         keyword_score=result["keyword_score"],
         confidence=result["confidence"],
         final_score=result["final_score"],
-        ai_feedback=result["feedback"]
+        ai_feedback=encrypted_feedback
     )
 
     return evaluation
