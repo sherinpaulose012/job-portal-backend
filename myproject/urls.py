@@ -5,6 +5,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.urls import path, include
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -25,7 +27,9 @@ urlpatterns = [
 
     path(
     "api/admin/",
-    include("admin_panel.urls"))
+    include("admin_panel.urls")),
+
+    path("payments/", include("payments.urls")),
 
 ]
 

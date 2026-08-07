@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "applications",
     'admin_panel',
     "notifications",
+    'payments',
 ]
 
 
@@ -79,7 +80,7 @@ REST_FRAMEWORK = {
     ],
 
     "DEFAULT_THROTTLE_RATES": {
-        "ai": "20/min",
+        "ai": "1000/min",
     },
 }
 SIMPLE_JWT = {
@@ -94,9 +95,14 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+
+   
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
     "accounts.middleware.RoleLoggingMiddleware",
 ]
 

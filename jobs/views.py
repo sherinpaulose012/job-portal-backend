@@ -55,7 +55,7 @@ class FeaturedJobAPIView(ListAPIView):
             is_featured=True
         )
 
-#LatestJobs
+#LatestJob
 class LatestJobAPIView(ListAPIView):
 
     serializer_class = JobSerializer
@@ -67,8 +67,10 @@ class LatestJobAPIView(ListAPIView):
             .filter(status=True)
             .order_by("-created_at")
         )
+from payments.models import UserSubscription
+from django.utils import timezone
+from jobs.models import Job, Recruiter
 
-# Job Create API
 class JobCreateAPIView(APIView):
 
     permission_classes = [
@@ -78,47 +80,74 @@ class JobCreateAPIView(APIView):
 
     def post(self, request):
 
-        serializer = JobSerializer(
-            data=request.data
+    # Find active subscription
+        subscription = UserSubscription.objects.filter(
+        user=request.user,
+        is_active=True,
+        end_date__gte=timezone.now().date()
+    ).select_related("plan").order_by("-end_date").first()
+
+    # No active subscription
+        if not subscription:
+            return Response(
+            {
+                "success": False,
+                "message": "Active subscription required to post jobs."
+            },
+            status=status.HTTP_403_FORBIDDEN
         )
+
+    # Find recruiter
+        try:
+            recruiter = Recruiter.objects.get(
+            user=request.user
+        )
+        except Recruiter.DoesNotExist:
+            return Response(
+            {
+                "success": False,
+                "message": "Recruiter profile not found."
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # FREE plan → maximum 3 active jobs
+        if subscription.plan.name == "FREE":
+
+            job_count = Job.objects.filter(
+            recruiter=recruiter,
+            status=True
+        ).count()
+
+        if job_count >= 3:
+            return Response(
+                {
+                    "success": False,
+                    "message": "FREE plan allows only 3 active job posts."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+    # Validate job data
+        serializer = JobSerializer(
+        data=request.data
+    )
 
         if serializer.is_valid():
 
-            print("REQUEST USER:", request.user)
-            print("REQUEST USER TYPE:", type(request.user))
-            print("REQUEST USER ID:", request.user.id)
-
-            job_user = User.objects.filter(
-                email=request.user.email
-            ).first()
-
-            if not job_user:
-
-                return Response(
-                    {
-                        "error":
-                        "Recruiter user not found"
-                    },
-                    status=404
-                )
-
-            recruiter = Recruiter.objects.get(
-                user=job_user
-            )
-
             serializer.save(
-                recruiter=recruiter
-            )
-
-            return Response(
-                serializer.data,
-                status=status.HTTP_201_CREATED
-            )
+            recruiter=recruiter
+        )
 
         return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
+            serializer.data,
+            status=status.HTTP_201_CREATED
         )
+
+        return Response(
+        serializer.errors,
+        status=status.HTTP_400_BAD_REQUEST
+    )
 # Job Update API
 class JobUpdateAPIView(APIView):
 
@@ -486,11 +515,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from payments.permissions import HasActiveSubscription
 
 class AnalyticsDashboardAPIView(APIView):
 
     permission_classes = [
-        IsAuthenticated,
+        HasActiveSubscription,
         IsRecruiter
     ]
 
