@@ -137,6 +137,12 @@ class ApplicationHistoryAPIView(ListAPIView):
         .filter(candidate=self.request.user)
         .order_by("-applied_date")
     )  
+
+from payments.models import UserSubscription
+from django.utils import timezone
+from rest_framework.response import Response
+from rest_framework import status
+
     
 class JobApplicantsAPIView(ListAPIView):
 
@@ -149,38 +155,55 @@ class JobApplicantsAPIView(ListAPIView):
 
     def get_queryset(self):
 
+        # Check active subscription
+        subscription = UserSubscription.objects.filter(
+            user=self.request.user,
+            is_active=True,
+            end_date__gte=timezone.now().date()
+        ).select_related("plan").order_by("-end_date").first()
+
+        # No active subscription
+        if not subscription:
+            return Application.objects.none()
+
         queryset = (
             Application.objects
             .select_related(
-            "candidate",
-            "job",
-            "job__recruiter"
+                "candidate",
+                "job",
+                "job__recruiter"
+            )
+            .filter(
+                job_id=self.kwargs["job_id"]
+            )
         )
-    .filter(job_id=self.kwargs["job_id"])
-)
 
-        status_filter = self.request.GET.get(
-            "status"
-        )
+        # Status filter
+        status_filter = self.request.GET.get("status")
 
         if status_filter:
-
             queryset = queryset.filter(
                 status=status_filter
             )
 
-        search = self.request.GET.get(
-            "search"
-        )
+        # Search
+        search = self.request.GET.get("search")
 
         if search:
             queryset = queryset.filter(
-            Q(candidate__email__icontains=search)
-    )
+                Q(candidate__email__icontains=search)
+            )
 
-        return queryset.order_by(
+        queryset = queryset.order_by(
             "-applied_date"
         )
+
+        # FREE plan → maximum 10 candidates
+        if subscription.plan.name == "FREE":
+            queryset = queryset[:10]
+
+        return queryset
+        
 
 class UpdateApplicationStatusAPIView(UpdateAPIView):
 

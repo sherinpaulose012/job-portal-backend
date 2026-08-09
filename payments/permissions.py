@@ -35,6 +35,30 @@ class HasActiveSubscription(BasePermission):
 
         return False
 
+class IsPremiumSubscription(BasePermission):
+
+    message = "Premium features require a PRO or ENTERPRISE plan."
+
+    def has_permission(self, request, view):
+
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        subscription = UserSubscription.objects.filter(
+            user=request.user,
+            is_active=True,
+            end_date__gte=timezone.now().date()
+        ).select_related("plan").order_by("-end_date").first()
+
+        if not subscription:
+            return False
+
+        return subscription.plan.name in [
+            "PRO",
+            "ENTERPRISE"
+        ]
+
+
 from django.utils import timezone
 from .models import UserSubscription
 
@@ -49,3 +73,18 @@ def get_active_subscription(user):
 
 def has_active_subscription(user):
     return get_active_subscription(user) is not None    
+
+
+from django.utils import timezone
+from .models import UserSubscription
+
+
+def expire_subscriptions():
+    today = timezone.now().date()
+
+    UserSubscription.objects.filter(
+        is_active=True,
+        end_date__lt=today
+    ).update(
+        is_active=False
+    )

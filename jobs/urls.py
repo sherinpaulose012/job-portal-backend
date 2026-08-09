@@ -16,6 +16,7 @@ from .views import (
     ScheduleInterviewAPIView,
     CandidateReportAPIView,
     AnalyticsDashboardAPIView,
+    PremiumCandidateRankingAPIView,
 )
 
 from .reminder_views import SendReminderAPIView
@@ -105,6 +106,11 @@ path(
     "analytics/dashboard/",
     AnalyticsDashboardAPIView.as_view(),
     name="analytics-dashboard"
+),
+
+path(
+    "premium/candidate-ranking/<int:job_id>/",
+    PremiumCandidateRankingAPIView.as_view(),
 ),
 
 ]

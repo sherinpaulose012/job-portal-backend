@@ -80,74 +80,79 @@ class JobCreateAPIView(APIView):
 
     def post(self, request):
 
-    # Find active subscription
+        # Find active subscription
         subscription = UserSubscription.objects.filter(
-        user=request.user,
-        is_active=True,
-        end_date__gte=timezone.now().date()
-    ).select_related("plan").order_by("-end_date").first()
+            user=request.user,
+            is_active=True,
+            end_date__gte=timezone.now().date()
+        ).select_related("plan").order_by("-end_date").first()
 
-    # No active subscription
+        # No active subscription
         if not subscription:
-            return Response(
-            {
-                "success": False,
-                "message": "Active subscription required to post jobs."
-            },
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-    # Find recruiter
-        try:
-            recruiter = Recruiter.objects.get(
-            user=request.user
-        )
-        except Recruiter.DoesNotExist:
-            return Response(
-            {
-                "success": False,
-                "message": "Recruiter profile not found."
-            },
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # FREE plan → maximum 3 active jobs
-        if subscription.plan.name == "FREE":
-
-            job_count = Job.objects.filter(
-            recruiter=recruiter,
-            status=True
-        ).count()
-
-        if job_count >= 3:
             return Response(
                 {
                     "success": False,
-                    "message": "FREE plan allows only 3 active job posts."
+                    "message": "Active subscription required to post jobs."
                 },
                 status=status.HTTP_403_FORBIDDEN
             )
 
-    # Validate job data
+        # Find recruiter
+        try:
+            recruiter = Recruiter.objects.get(
+                user=request.user
+            )
+        except Recruiter.DoesNotExist:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Recruiter profile not found."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check job posting limit
+        job_count = Job.objects.filter(
+            recruiter=recruiter,
+            status=True
+        ).count()
+
+        job_limit = subscription.plan.job_post_limit
+
+        if job_count >= job_limit:
+            return Response(
+                {
+                    "success": False,
+                    "message": (
+                        f"{subscription.plan.name} plan allows "
+                        f"only {job_limit} active job posts."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Validate job data
         serializer = JobSerializer(
-        data=request.data
-    )
+            data=request.data
+        )
 
         if serializer.is_valid():
 
             serializer.save(
-            recruiter=recruiter
-        )
+                recruiter=recruiter
+            )
+
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
 
         return Response(
-            serializer.data,
-            status=status.HTTP_201_CREATED
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
         )
 
-        return Response(
-        serializer.errors,
-        status=status.HTTP_400_BAD_REQUEST
-    )
+    
 # Job Update API
 class JobUpdateAPIView(APIView):
 
@@ -481,6 +486,9 @@ from applications.models import Application
 
 from .report_service import CandidateReportService
 from .report_serializer import CandidateReportSerializer
+
+from payments.models import UserSubscription
+from django.utils import timezone
 class CandidateReportAPIView(APIView):
 
     permission_classes = [
@@ -489,15 +497,53 @@ class CandidateReportAPIView(APIView):
     ]
 
     throttle_classes = [
-    AIRateThrottle
+        AIRateThrottle
     ]
 
     def get(self, request, application_id):
 
-        application = Application.objects.get(
-            id=application_id
-        )
+        # Check active subscription
+        subscription = UserSubscription.objects.filter(
+            user=request.user,
+            is_active=True,
+            end_date__gte=timezone.now().date()
+        ).select_related("plan").order_by("-end_date").first()
 
+        # No active subscription
+        if not subscription:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Active subscription required for AI reports."
+                },
+                status=403
+            )
+
+        # FREE users cannot access premium AI reports
+        if subscription.plan.name == "FREE":
+            return Response(
+                {
+                    "success": False,
+                    "message": "Premium AI reports require a PRO or ENTERPRISE plan."
+                },
+                status=403
+            )
+
+        # Find application
+        try:
+            application = Application.objects.get(
+                id=application_id
+            )
+        except Application.DoesNotExist:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Application not found."
+                },
+                status=404
+            )
+
+        # Generate report
         report = CandidateReportService().generate(
             application
         )
@@ -506,7 +552,10 @@ class CandidateReportAPIView(APIView):
             report
         )
 
-        return Response(serializer.data)    
+        return Response(
+            serializer.data,
+            status=200
+        )  
 
 from .analytics_service import AnalyticsService
 from .permissions import IsRecruiter
@@ -517,15 +566,17 @@ from rest_framework.permissions import IsAuthenticated
 
 from payments.permissions import HasActiveSubscription
 
+from payments.permissions import IsPremiumSubscription
+
 class AnalyticsDashboardAPIView(APIView):
 
     permission_classes = [
-        HasActiveSubscription,
+        IsPremiumSubscription,
         IsRecruiter
     ]
 
     throttle_classes = [
-    AIRateThrottle
+        AIRateThrottle
     ]
 
     def get(self, request):
@@ -534,4 +585,90 @@ class AnalyticsDashboardAPIView(APIView):
 
         return Response(
             service.dashboard()
-        )    
+        )
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from payments.models import UserSubscription
+from django.utils import timezone
+
+from .permissions import IsRecruiter
+from .premium_services import PremiumRecruiterReportService
+
+class PremiumCandidateRankingAPIView(APIView):
+
+    permission_classes = [
+        IsAuthenticated,
+        IsRecruiter
+    ]
+
+    throttle_classes = [
+        AIRateThrottle
+    ]
+
+    def get(self, request, job_id):
+
+        # -------------------------
+        # CHECK SUBSCRIPTION
+        # -------------------------
+
+        subscription = UserSubscription.objects.filter(
+            user=request.user,
+            is_active=True,
+            end_date__gte=timezone.now().date()
+        ).select_related(
+            "plan"
+        ).order_by(
+            "-end_date"
+        ).first()
+
+        # No active subscription
+
+        if not subscription:
+
+            return Response(
+                {
+                    "success": False,
+                    "message": (
+                        "Active subscription required "
+                        "for premium recruiter reports."
+                    )
+                },
+                status=403
+            )
+
+        # FREE plan cannot access premium report
+
+        if subscription.plan.name == "FREE":
+
+            return Response(
+                {
+                    "success": False,
+                    "message": (
+                        "Premium candidate ranking "
+                        "requires a PRO or ENTERPRISE plan."
+                    )
+                },
+                status=403
+            )
+
+        # -------------------------
+        # GENERATE REPORT
+        # -------------------------
+
+        report = (
+            PremiumRecruiterReportService
+            .candidate_ranking(job_id)
+        )
+
+        return Response(
+            {
+                "success": True,
+                "plan": subscription.plan.name,
+                "job_id": job_id,
+                "candidates": report
+            },
+            status=200
+        )
